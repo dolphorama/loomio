@@ -11,6 +11,7 @@ class Motion < ActiveRecord::Base
   has_many :votes, :dependent => :destroy, include: :user
   has_many :unique_votes, class_name: 'Vote', conditions: { age: 0 }, include: :user
   has_many :did_not_votes, :dependent => :destroy, include: :user
+  has_many :did_not_voters, through: :did_not_votes, source: :user
   has_many :events, :as => :eventable, :dependent => :destroy, include: :eventable
   has_many :motion_readers, dependent: :destroy
 
@@ -26,7 +27,7 @@ class Motion < ActiveRecord::Base
   delegate :email, :to => :author, :prefix => :author
   delegate :name, :to => :author, :prefix => :author
   delegate :group, :group_id, :to => :discussion
-  delegate :users, :full_name, :to => :group, :prefix => :group
+  delegate :members, :full_name, :to => :group, :prefix => :group
   delegate :email_new_motion?, to: :group, prefix: :group
   delegate :name_and_email, to: :user, prefix: :author
 
@@ -156,13 +157,19 @@ class Motion < ActiveRecord::Base
     end
   end
 
-  # members_not_voted_count
-  # was no_vote_count
   def members_not_voted_count
     if voting?
-      group_size_when_voting - total_votes_count
+      group_members.size - total_votes_count
     else
       did_not_votes_count
+    end
+  end
+
+  def members_not_voted
+    if voting?
+      group_members - voters
+    else
+      did_not_voters
     end
   end
 
