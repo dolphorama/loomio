@@ -17,7 +17,7 @@ class Vote < ActiveRecord::Base
 
   POSITIONS = %w[yes abstain no block]
   default_scope include: :previous_vote
-  belongs_to :motion, counter_cache: true
+  belongs_to :motion, counter_cache: true, touch: :last_vote_at
   belongs_to :user
   belongs_to :previous_vote, class_name: 'Vote'
   has_many :events, :as => :eventable, :dependent => :destroy
@@ -42,8 +42,8 @@ class Vote < ActiveRecord::Base
   before_create :age_previous_votes, :associate_previous_vote
   after_save :update_motion_vote_counts, :send_notifications
 
-  after_create :update_motion_last_vote_at, :fire_new_vote_event
-  after_destroy :update_motion_last_vote_at, :update_motion_vote_counts
+  after_create :fire_new_vote_event
+  after_destroy :update_motion_vote_counts
 
   def other_group_members
     group.users.where(User.arel_table[:id].not_eq(user.id))
@@ -73,13 +73,6 @@ class Vote < ActiveRecord::Base
   def update_motion_vote_counts
     unless motion.nil? || motion.discussion.nil?
       motion.update_vote_counts!
-    end
-  end
-
-  def update_motion_last_vote_at
-    unless motion.nil? || motion.discussion.nil?
-      motion.last_vote_at = motion.latest_vote_time
-      motion.save!
     end
   end
 

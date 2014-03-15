@@ -74,14 +74,6 @@ class Motion < ActiveRecord::Base
     closed_at.present?
   end
 
-  def as_read_by(user)
-    if user.blank?
-      self.motion_readers.build(motion: self)
-    else
-      find_or_new_motion_reader_for(user)
-    end
-  end
-
   def has_votes?
     total_votes_count > 0
   end
@@ -133,16 +125,6 @@ class Motion < ActiveRecord::Base
     user && group.users.include?(user)
   end
 
-  def latest_vote_time
-    if last_vote_at.present?
-      last_vote_at
-    else
-      # this seems incorrect behaviour
-      # and without it this method could be removed
-      created_at
-    end
-  end
-
   def last_vote_by_user(user)
     return nil if user.nil?
 
@@ -157,11 +139,11 @@ class Motion < ActiveRecord::Base
     end
   end
 
-  def members_not_voted_count
+  def group_size_when_voting
     if voting?
-      group_members.size - total_votes_count
+      group.memberships_count
     else
-      did_not_votes_count
+      total_votes_count + members_not_voted_count
     end
   end
 
@@ -173,6 +155,14 @@ class Motion < ActiveRecord::Base
     end
   end
 
+  def members_not_voted_count
+    if voting?
+      group_members.size - total_votes_count
+    else
+      did_not_votes_count
+    end
+  end
+
   def percent_voted
     if group_size_when_voting == 0
       0
@@ -180,7 +170,6 @@ class Motion < ActiveRecord::Base
       (100-(members_not_voted_count/group_size_when_voting.to_f * 100)).to_i
     end
   end
-
 
   # recount all the final votes.
   # rather expensive
@@ -203,14 +192,6 @@ class Motion < ActiveRecord::Base
     self[:votes_count] = votes.count
 
     save!
-  end
-
-  def group_size_when_voting
-    if voting?
-      group.memberships_count || 0
-    else
-      total_votes_count + members_not_voted_count
-    end
   end
 
   # todo: move to motion mover service
